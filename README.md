@@ -1,10 +1,10 @@
-# Literally
+# Literally ![npm](https://img.shields.io/npm/v/literally-cli)
 `literally` is a tool for literate programming in Javascript.  The `literally`
 "compiler" is itself an example of literate programming, and this `README.md` is
 its source.  You can install `literally` and use it to compile from markdown:
 
 ```bash
-yarn add literally
+yarn add literally-cli
 yarn literally my_literate_module.md
 ```
 

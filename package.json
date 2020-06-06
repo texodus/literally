@@ -1,11 +1,14 @@
 {
     "name": "literally-cli",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "description": "A tool for literate programming, which can be used to generate various executable assets from markdown files.",
     "main": "dist/literally.js",
     "repository": "https://github.com/texodus/literally",
     "author": "texodus",
     "license": "MIT",
+    "files": [
+        "dist/**/*"
+    ],
     "dependencies": {
         "commander": "^5.1.0",
         "eslint": "^7.1.0",
