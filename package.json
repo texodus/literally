@@ -1,0 +1,9 @@
+{
+  "name": "literally",
+  "version": "1.0.0",
+  "description": "A tool for literate programming, which can generate various executable output from Markdown",
+  "main": "index.js",
+  "repository": "https://github.com/texodus/literally",
+  "author": "texodus",
+  "license": "MIT"
+}
