@@ -1,1 +1,3 @@
 node_modules
+dist/literally.development.handlebars
+dist/literally.development.js

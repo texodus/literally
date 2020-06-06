@@ -26,6 +26,10 @@
         "literally": "literally"
     },
     "scripts": {
-        "build": "./literally --format node --output dist --name literally README.md"
+        "bootstrap": "yarn literally-dev --format node --output dist --name literally README.md",
+        "build": "./literally --format node --output dist --name literally.development README.md",
+        "literally-dev": "node --eval \"require('./dist/literally.development.js')\" literally",
+        "bootstrap-dev": "yarn literally-dev --format node --output dist --name literally.development README.md",
+        "test": "yarn build && yarn bootstrap-dev && yarn bootstrap-dev"
     }
 }
