@@ -1,4 +1,8 @@
-# Literally ![npm](https://img.shields.io/npm/v/literally-cli)
+
+<img src="literally.png"></img>
+
+![npm](https://img.shields.io/npm/v/literally-cli?color=brightgreen)
+
 `literally` is a tool for literate programming in Javascript.  The `literally`
 "compiler" is itself an example of literate programming, and this `README.md` is
 its source.  You can install `literally` and use it to compile from markdown:
