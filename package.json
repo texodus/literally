@@ -20,7 +20,8 @@
         "marked-ast": "^0.3.0",
         "marked-ast-markdown": "^2.1.0",
         "prettier": "^2.0.5",
-        "rimraf": "^3.0.2"
+        "rimraf": "^3.0.2",
+        "sharp": "^0.25.3"
     },
     "bin": {
         "literally": "literally"
@@ -31,5 +32,9 @@
         "literally-dev": "node --eval \"require('./dist/literally.development.js')\" literally",
         "bootstrap-dev": "yarn literally-dev --format node --output dist --name literally.development README.md",
         "test": "yarn build && yarn bootstrap-dev && yarn bootstrap-dev"
+    },
+    "peerDependencies": {
+        "http-server": "^0.12.3",
+        "puppeteer": "^3.3.0"
     }
 }

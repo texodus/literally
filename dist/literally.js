@@ -7,7 +7,7 @@ const program = require("commander");
 const glob = require("glob");
 const handlebars = require("handlebars");
 
-const PACKAGE = JSON.parse(fs.readFileSync("package.json").toString());
+const PACKAGE = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json")).toString());
 
 program
     .storeOptionsAsProperties(false)
@@ -20,6 +20,7 @@ program
     .option("-c, --config <path>", "The path for your literal config", (x) => x, "literally.config.js")
     .option("-c, --config <path>", "The path for your literal config", (x) => x, "literally.config.js")
     .option("-f, --format <format>", "Which output format to use:  block, node, html.")
+    .option("-s, --screenshot", "Should screenshots be captured also? (`block` mode only`)")
     .option("--watch", "Compile continuously")
     .action(run_compiler);
 
@@ -46,6 +47,8 @@ function run_compiler(cli_files) {
     const watch = cmd.watch || config.watch;
     const format = cmd.format || config.format || "html";
     const name = cmd.name || config.name;
+    const screenshot = cmd.screenshot;
+    const retartget = config.retarget || [];
 
     if (!files || !(files.length > 0)) {
         console.error("No input files!");
@@ -69,9 +72,9 @@ function run_compiler(cli_files) {
                     fs.watchFile(file, () => compile_to_node(file, output, name));
                 }
             } else if (format === "block") {
-                compile_to_blocks(file, output, name);
+                compile_to_blocks(file, output, name, retartget, screenshot);
                 if (watch) {
-                    fs.watchFile(file, () => compile_to_blocks(file, output, name));
+                    fs.watchFile(file, () => compile_to_blocks(file, output, name, retartget, screenshot));
                 }
             }
         }
@@ -86,7 +89,7 @@ function compile_to_html(file, output, name) {
     const html = extract(md, "html");
     const final = template({html, js, css});
     fs.writeFileSync(`${path_prefix}.html`, final);
-    console.log(`Compiled ${path_prefix}.html`);
+    console.log(`Literally compiled ${path_prefix}.html`);
 }
 
 function compile_to_node(file, output, name) {
@@ -95,28 +98,60 @@ function compile_to_node(file, output, name) {
     const js = extract(md, "javascript");
     const handlebars = extract(md, "handlebars");
     fs.writeFileSync(`${path_prefix}.js`, js);
-    console.log(`Compiled ${path_prefix}.js`);
+    console.log(`Literally compiled ${path_prefix}.js`);
     if (handlebars.length > 0) {
         fs.writeFileSync(`${path_prefix}.handlebars`, handlebars);
-        console.log(`Compiled ${path_prefix}.handlebars`);
+        console.log(`Literally compiled ${path_prefix}.handlebars`);
     }
 }
 
-function compile_to_blocks(file, output, name) {
-    const md = fs.readFileSync(file).toString();
+function retarget() {}
+async function compile_to_blocks(file, output, name, retarget, is_screenshot) {
+    let md = fs.readFileSync(file).toString();
+    for (const {rule, value} of retarget) {
+        md = md.replace(new RegExp(rule, "gm"), value);
+    }
     const js = extract(md, "javascript");
     const css = extract(md, "css");
     const html = extract(md, "html");
     const block = extract(md, "block");
     const final = template({html, js, css});
     fs.writeFileSync(path.join(output, "index.html"), final);
-    console.log(`Compiled ${path.join(output, "index.html")}`);
+    console.log(`Literally compiled ${path.join(output, "index.html")}`);
     if (block.length > 0) {
         fs.writeFileSync(path.join(output, ".block"), block);
-        console.log(`Compiled ${path.join(output, ".block")}`);
+        console.log(`Literally compiled ${path.join(output, ".block")}`);
     }
     fs.writeFileSync(path.join(output, "README.md"), blocks_markdown(md));
-    console.log(`Compiled ${path.join(output, "README.md")}`);
+    console.log(`Literally compiled ${path.join(output, "README.md")}`);
+    if (is_screenshot) {
+        await screenshot(output, name);
+    }
+}
+
+async function screenshot(output, name) {
+    const {createServer} = require("http-server");
+    const sharp = require("sharp");
+    const server = createServer({root: process.cwd()});
+    server.listen();
+    const port = server.server.address().port;
+    const puppeteer = require("puppeteer");
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.setViewport({width: 960, height: 500});
+    await page.goto(`http://localhost:${port}/${output}/index.html`);
+    //await page.waitForNavigation({waitUntil: "networkidle2"});
+    await page.waitFor(1000);
+    await page.screenshot({
+        //  fullPage: true,
+        path: path.join(output, "preview.png"),
+    });
+    console.log(`Captured preview.png`);
+    sharp(path.join(output, "preview.png")).resize(230, 120).toFile(path.join(output, "thumbnail.png"));
+    console.log(`Captured thumbnail.png`);
+    server.close();
+
+    await browser.close();
 }
 
 function extract(src, lang) {
