@@ -1,30 +1,48 @@
-const fs = require("fs");
-const path = require("path");
+function init_cli() {
+    const pkg = get_package();
+    program
+        .storeOptionsAsProperties(false)
+        .passCommandToAction(false)
+        .version(pkg.version)
+        .description(pkg.description);
 
-const marked_ast = require("marked-ast");
-const marked_ast_markdown = require("marked-ast-markdown");
-const program = require("commander");
-const glob = require("glob");
-const handlebars = require("handlebars");
+    program
+        .arguments("[inputs...]")
+        .option(
+            "-o, --output <path>",
+            "The output path to write result files to"
+        )
+        .option(
+            "-n, --name <name>",
+            "The asset name (`html` and `node` format only)"
+        )
+        .option(
+            "-c, --config <path>",
+            "The path for your literal config",
+            (x) => x,
+            "literally.config.js"
+        )
+        .option(
+            "-c, --config <path>",
+            "The path for your literal config",
+            (x) => x,
+            "literally.config.js"
+        )
+        .option(
+            "-f, --format <format>",
+            "Which output format to use:  block, node, html."
+        )
+        .option(
+            "-s, --screenshot",
+            "Should screenshots be captured also? (`block` mode only`)"
+        )
+        .option("--watch", "Compile continuously")
+        .action(run_compiler);
 
-const PACKAGE = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json")).toString());
+    program.parse(process.argv);
+}
 
-program
-    .storeOptionsAsProperties(false)
-    .passCommandToAction(false)
-    .version(PACKAGE.version)
-    .description(PACKAGE.description)
-    .arguments("[inputs...]")
-    .option("-o, --output <path>", "The output path to write result files to")
-    .option("-n, --name <name>", "The asset name (`html` and `node` format only)")
-    .option("-c, --config <path>", "The path for your literal config", (x) => x, "literally.config.js")
-    .option("-c, --config <path>", "The path for your literal config", (x) => x, "literally.config.js")
-    .option("-f, --format <format>", "Which output format to use:  block, node, html.")
-    .option("-s, --screenshot", "Should screenshots be captured also? (`block` mode only`)")
-    .option("--watch", "Compile continuously")
-    .action(run_compiler);
-
-setTimeout(() => program.parse(process.argv));
+setTimeout(init_cli);
 
 function load_config(cmd) {
     let {config} = cmd;
@@ -38,7 +56,6 @@ function load_config(cmd) {
     }
 }
 
-
 function run_compiler(cli_files) {
     const cmd = program.opts();
     const config = load_config(cmd);
@@ -47,7 +64,7 @@ function run_compiler(cli_files) {
     const watch = cmd.watch || config.watch;
     const format = cmd.format || config.format || "html";
     const name = cmd.name || config.name;
-    const screenshot = cmd.screenshot;
+    const screenshot = cmd.screenshot || config.screenshot;
     const retartget = config.retarget || [];
 
     if (!files || !(files.length > 0)) {
@@ -61,36 +78,24 @@ function run_compiler(cli_files) {
 
     for (const term of files) {
         for (const file of glob.sync(path.join(process.cwd(), term))) {
-            if (format === "html") {
-                compile_to_html(file, output, name);
-                if (watch) {
-                    fs.watchFile(file, () => compile_to_html(file, output, name));
-                }
-            } else if (format === "node") {
-                compile_to_node(file, output, name);
-                if (watch) {
-                    fs.watchFile(file, () => compile_to_node(file, output, name));
-                }
-            } else if (format === "block") {
-                compile_to_blocks(file, output, name, retartget, screenshot);
-                if (watch) {
-                    fs.watchFile(file, () => compile_to_blocks(file, output, name, retartget, screenshot));
-                }
-            }
+            const compiler = COMPILERS[format];
+            compiler(watch, file, output, name, retartget, screenshot);
         }
     }
 }
 
-function compile_to_html(file, output, name) {
-    const path_prefix = path.join(output, name || path.parse(file).name);
-    const md = fs.readFileSync(file).toString();
-    const js = extract(md, "javascript");
-    const css = extract(md, "css");
-    const html = extract(md, "html");
-    const final = template({html, js, css});
-    fs.writeFileSync(`${path_prefix}.html`, final);
-    console.log(`Literally compiled ${path_prefix}.html`);
+function runwatch(watch, file, ...args) {
+    this(file, ...args);
+    if (watch) {
+        fs.watchFile(file, () => this(file, ...args));
+    }
 }
+
+const COMPILERS = {
+    html: runwatch.bind(compile_to_html),
+    node: runwatch.bind(compile_to_node),
+    block: runwatch.bind(compile_to_blocks),
+};
 
 function compile_to_node(file, output, name) {
     const path_prefix = path.join(output, name || path.parse(file).name);
@@ -105,7 +110,6 @@ function compile_to_node(file, output, name) {
     }
 }
 
-function retarget() {}
 async function compile_to_blocks(file, output, name, retarget, is_screenshot) {
     let md = fs.readFileSync(file).toString();
     for (const {rule, value} of retarget) {
@@ -147,11 +151,40 @@ async function screenshot(output, name) {
         path: path.join(output, "preview.png"),
     });
     console.log(`Captured preview.png`);
-    sharp(path.join(output, "preview.png")).resize(230, 120).toFile(path.join(output, "thumbnail.png"));
+    sharp(path.join(output, "preview.png"))
+        .resize(230, 120)
+        .toFile(path.join(output, "thumbnail.png"));
     console.log(`Captured thumbnail.png`);
     server.close();
 
     await browser.close();
+}
+
+function compile_to_html(file, output, name) {
+    const path_prefix = path.join(output, name || path.parse(file).name);
+    const md = fs.readFileSync(file).toString();
+    const js = extract(md, "javascript");
+    const css = extract(md, "css");
+    const html = extract(md, "html");
+    const final = template({html, js, css});
+    fs.writeFileSync(`${path_prefix}.html`, final);
+    console.log(`Literally compiled ${path_prefix}.html`);
+}
+
+function template(...args) {
+    const template_path = path.join(__dirname, "literally.handlebars");
+    const template_src = fs.readFileSync(template_path).toString();
+    handlebars.registerHelper("indent", indent);
+    return handlebars.compile(template_src)(args);
+}
+
+function indent(txt, data) {
+    const spaces = data.loc.start.column;
+    return txt
+        .split("\n")
+        .map((line) => line.padStart(line.length + spaces, " "))
+        .join("\n")
+        .trimStart();
 }
 
 function extract(src, lang) {
@@ -169,25 +202,25 @@ function blocks_markdown(txt) {
     const ast = marked_ast.parse(txt);
     for (const section of ast) {
         if (section.type === "paragraph") {
-            section.text = section.text.map((x) => (x.replace ? x.replace(/\n/gm, " ") : x));
+            section.text = section.text.map((x) =>
+                x.replace ? x.replace(/\n/gm, " ") : x
+            );
         }
     }
 
     return marked_ast_markdown.toMarkdown(ast);
 }
 
-const template_path = path.join(__dirname, "literally.handlebars");
-
-const template_src = fs.readFileSync(template_path).toString();
-const template = handlebars.compile(template_src);
-
-function indent(txt, data) {
-    const spaces = data.loc.start.column;
-    return txt
-        .split("\n")
-        .map((line) => line.padStart(line.length + spaces, " "))
-        .join("\n")
-        .trimStart();
+function get_package() {
+    const pkg_path = path.join(__dirname, "../package.json");
+    return JSON.parse(fs.readFileSync(pkg_path).toString());
 }
 
-handlebars.registerHelper("indent", indent);
+const fs = require("fs");
+const path = require("path");
+
+const marked_ast = require("marked-ast");
+const marked_ast_markdown = require("marked-ast-markdown");
+const program = require("commander");
+const glob = require("glob");
+const handlebars = require("handlebars");
