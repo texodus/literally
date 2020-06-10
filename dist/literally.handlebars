@@ -14,10 +14,14 @@
         {{{indent html}}}
 
         {{/if}}
-        {{#if js}}
+        {{#if javascript}}
         <script>
-            {{{indent js}}}
+            {{{indent javascript}}}
         </script>
+        {{/if}}
+        {{#if src}}
+        <script src="{{{src}}}"></script>
         {{/if}}
     </body>
 </html>
+

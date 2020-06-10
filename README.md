@@ -18,6 +18,20 @@ the source's extracted CSS, Javascript and HTML blocks.
 yarn literally my_literate_module.md
 ```
 
+You should node have a `my_literate_module.html` file in your working directory,
+with the original markdown source's CSS, Javascript and HTML blocks inlined
+in their proper locations.  This is the default output format, `inline-html`,
+but literally has several other output formats available via the `--format`
+flag, which can output separate assets for:
+
+* `.js`
+* `.js.map` (source maps)
+* `.css`
+* `.html`
+* `.md` (cleaned source)
+* `preview.png` and `thumbnail.png` (screenshots taken via `puppeteer` in bl.ocks sizes).
+* `.block` (bl.ocks metadata for)
+
 If you are developing/hacking on `literally` itself, you can build this
 `README.md` on top of your local build's compiler (aliased to `yarn bootstrap`).
 You'll need to run this command twice to _bootstrap_, or compile the
@@ -33,6 +47,7 @@ compiler with the compiler you just compiled.
 - [`block` Format](#block-format)
 - [`html` Format](#html-format)
 - [Markdown Parsing](#markdown-parsing)
+- [Javascript and Source Maps](#javascript-and-source-maps)
 - [Appendix (Utilities)](#appendix-utilities)
 - [Appendix (Imports)](#appendix-imports)
 - [Appendix (Metadata)](#appendix-metadata)
@@ -69,15 +84,7 @@ function init_cli() {
         )
         .option(
             "-c, --config <path>",
-            "The path for your literal config",
-            (x) => x,
-            "literally.config.js"
-        )
-        .option(
-            "-c, --config <path>",
-            "The path for your literal config",
-            (x) => x,
-            "literally.config.js"
+            "The path for your literal config, defaults to literally.config.js"
         )
         .option(
             "-f, --format <format>",
@@ -101,7 +108,7 @@ file.
 
 ```javascript
 function load_config(cmd) {
-    let {config} = cmd;
+    let {config = "literally.config.js"} = cmd;
     if (!config.startsWith("/")) {
         config = path.join(process.cwd(), config);
     }
@@ -132,7 +139,7 @@ function run_compiler(cli_files) {
         return;
     }
 
-    if (output.endsWith("/") && !fs.existsSync(output)) {
+    if (!fs.existsSync(output)) {
         fs.mkdirSync(output);
     }
 
@@ -157,6 +164,7 @@ function runwatch(watch, file, ...args) {
 }
 
 const COMPILERS = {
+    inlinehtml: runwatch.bind(compile_to_inlinehtml),
     html: runwatch.bind(compile_to_html),
     node: runwatch.bind(compile_to_node),
     block: runwatch.bind(compile_to_blocks),
@@ -169,11 +177,12 @@ const COMPILERS = {
 
 ```javascript
 function compile_to_node(file, output, name) {
-    const path_prefix = path.join(output, name || path.parse(file).name);
+    const md_name = path.parse(file).name;
+    const out_name = name || md_name;
+    const path_prefix = path.join(output, out_name);
     const md = fs.readFileSync(file).toString();
-    const js = extract(md, "javascript");
-    const handlebars = extract(md, "handlebars");
-    fs.writeFileSync(`${path_prefix}.js`, js);
+    const {javascript, handlebars} = extract(md_name, out_name, md);
+    fs.writeFileSync(`${path_prefix}.js`, javascript);
     console.log(`Literally compiled ${path_prefix}.js`);
     if (handlebars.length > 0) {
         fs.writeFileSync(`${path_prefix}.handlebars`, handlebars);
@@ -192,21 +201,22 @@ async function compile_to_blocks(file, output, name, retarget, is_screenshot) {
     for (const {rule, value} of retarget) {
         md = md.replace(new RegExp(rule, "gm"), value);
     }
-    const js = extract(md, "javascript");
-    const css = extract(md, "css");
-    const html = extract(md, "html");
-    const block = extract(md, "block");
-    const final = template({html, js, css});
+    const md_name = path.parse(file).name;
+    const out_name = name || md_name;
+
+    const parsed = extract(md_name, out_name, md);
+    const {javascript, css, html, block, markdown} = parsed;
+    const final = template({html, javascript, css});
     fs.writeFileSync(path.join(output, "index.html"), final);
     console.log(`Literally compiled ${path.join(output, "index.html")}`);
     if (block.length > 0) {
         fs.writeFileSync(path.join(output, ".block"), block);
         console.log(`Literally compiled ${path.join(output, ".block")}`);
     }
-    fs.writeFileSync(path.join(output, "README.md"), blocks_markdown(md));
+    fs.writeFileSync(path.join(output, "README.md"), markdown);
     console.log(`Literally compiled ${path.join(output, "README.md")}`);
     if (is_screenshot) {
-        await screenshot(output, name);
+        await screenshot(output, out_name);
     }
 }
 ```
@@ -229,7 +239,6 @@ async function screenshot(output, name) {
     //await page.waitForNavigation({waitUntil: "networkidle2"});
     await page.waitFor(1000);
     await page.screenshot({
-        //  fullPage: true,
         path: path.join(output, "preview.png"),
     });
     console.log(`Captured preview.png`);
@@ -246,13 +255,33 @@ async function screenshot(output, name) {
 # `html` Format
 
 ```javascript
-function compile_to_html(file, output, name) {
-    const path_prefix = path.join(output, name || path.parse(file).name);
+function compile_to_inlinehtml(file, output, name) {
+    const md_name = path.parse(file).name;
+    const out_name = name || md_name;
+    const path_prefix = path.join(output, out_name);
     const md = fs.readFileSync(file).toString();
-    const js = extract(md, "javascript");
-    const css = extract(md, "css");
-    const html = extract(md, "html");
-    const final = template({html, js, css});
+    const {javascript, css, html} = extract(md_name, out_name, md);
+    const final = template({html, javascript, css});
+    fs.writeFileSync(`${path_prefix}.html`, final);
+    console.log(`Literally compiled ${path_prefix}.html`);
+}
+
+function compile_to_html(file, output, name) {
+    const md_name = path.parse(file).name;
+    const out_name = name || md_name;
+
+    const path_prefix = path.join(output, out_name);
+    const md = fs.readFileSync(file).toString();
+    let {javascript, sourcemap, css, html} = extract(md_name, out_name, md);
+    javascript += `\n\n//# sourceMappingURL=${out_name}.js.map`;
+
+    fs.writeFileSync(`${path_prefix}.js`, javascript || "");
+    console.log(`Literally compiled ${path_prefix}.js`);
+
+    fs.writeFileSync(`${path_prefix}.js.map`, sourcemap || "");
+    console.log(`Literally compiled ${path_prefix}.js.map`);
+
+    const final = template({html, src: `${out_name}.js`, css});
     fs.writeFileSync(`${path_prefix}.html`, final);
     console.log(`Literally compiled ${path_prefix}.html`);
 }
@@ -279,10 +308,13 @@ function compile_to_html(file, output, name) {
         {{{indent html}}}
 
         {{/if}}
-        {{#if js}}
+        {{#if javascript}}
         <script>
-            {{{indent js}}}
+            {{{indent javascript}}}
         </script>
+        {{/if}}
+        {{#if src}}
+        <script src="{{{src}}}"></script>
         {{/if}}
     </body>
 </html>
@@ -300,7 +332,7 @@ function template(...args) {
     const template_path = path.join(__dirname, "literally.handlebars");
     const template_src = fs.readFileSync(template_path).toString();
     handlebars.registerHelper("indent", indent);
-    return handlebars.compile(template_src)(args);
+    return handlebars.compile(template_src)(...args);
 }
 ```
 
@@ -325,32 +357,55 @@ function indent(txt, data) {
 We'll need some helpers for dealing with markdown
 
 ```javascript
-function extract(src, lang) {
-    let output = marked_ast.parse(src);
-    let js = [];
-    for (const section of output) {
-        if (section.type === "code" && section.lang === lang) {
-            js.push(section.code);
-        }
-    }
-    return js.join("\n\n");
-}
-```
+function extract(md_name, out_name, src, is_blocks = false) {
+    let ast = marked_ast.parse(src);
+    const blocks = {markdown: "", javascript: []};
 
-Clean markdown to `bl.ocks` format
-
-```javascript
-function blocks_markdown(txt) {
-    const ast = marked_ast.parse(txt);
-    for (const section of ast) {
-        if (section.type === "paragraph") {
+    for (const index in ast) {
+        const section = ast[index];
+        blocks[section.lang] = blocks[section.lang] || "";
+        if (section.lang === "javascript") {
+            for (node of extract_js(blocks, md_name, section)) {
+                blocks.javascript.push(node);
+            }
+        } else if (section.type === "code") {
+            blocks[section.lang] += section.code + "\n\n";
+        } else if (section.type === "paragraph" && is_blocks) {
             section.text = section.text.map((x) =>
                 x.replace ? x.replace(/\n/gm, " ") : x
             );
         }
+        const clean_md = marked_ast_markdown.writeNode(section, index, ast);
+        blocks.markdown += clean_md.trim() + "\n\n";
     }
 
-    return marked_ast_markdown.toMarkdown(ast);
+    return extract_sourcemap(md_name, out_name, blocks);
+}
+```
+
+# Javascript and Source Maps
+
+Javascript requires special handling to support source maps - they need the
+original Markdown so the generated Javascript can be annotated with it's
+source for debugging.
+
+```javascript
+function extract_sourcemap(md_name, out_name, blocks) {
+    const {javascript, markdown} = blocks;
+    const sm = new sourceMap.SourceNode(1, 1, `${md_name}.md`, javascript);
+    sm.setSourceContent(`${md_name}.md`, markdown);
+    const {code, map} = sm.toStringWithSourceMap({file: `${out_name}.js`});
+    return {...blocks, javascript: code, sourcemape: map.toString()};
+}
+
+function* extract_js(blocks, md_name, section) {
+    let ln = blocks.markdown.split("\n").length + 1;
+    for (const line of section.code.split("\n")) {
+        if (line.length > 0) {
+            yield new sourceMap.SourceNode(ln, 1, `${md_name}.md`, line + "\n");
+        }
+        ln++;
+    }
 }
 ```
 
@@ -382,6 +437,7 @@ const marked_ast_markdown = require("marked-ast-markdown");
 const program = require("commander");
 const glob = require("glob");
 const handlebars = require("handlebars");
+const sourceMap = require("source-map");
 ```
 
 # Appendix (Metadata)
