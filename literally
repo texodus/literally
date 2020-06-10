@@ -1,4 +1,4 @@
-#!/usr/bin/env node --max-old-space-size=8192
+#!/usr/bin/env node
 /* eslint no-var: 0 */
 
 require(__dirname);

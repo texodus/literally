@@ -1,7 +1,7 @@
-
 <img src="https://raw.githubusercontent.com/texodus/literally/master/literally.png"></img>
 
 ![npm](https://img.shields.io/npm/v/literally-cli?color=brightgreen)
+[![Build Status](https://travis-ci.org/texodus/literally.svg?branch=master)](https://travis-ci.org/texodus/literally)
 
 `literally` is a tool for literate programming in Javascript.  The `literally`
 "compiler" is itself an example of literate programming, and this `README.md` is
@@ -18,7 +18,7 @@ the source's extracted CSS, Javascript and HTML blocks.
 yarn literally my_literate_module.md
 ```
 
-You should node have a `my_literate_module.html` file in your working directory,
+You should now have a `my_literate_module.html` file in your working directory,
 with the original markdown source's CSS, Javascript and HTML blocks inlined
 in their proper locations.  This is the default output format, `inline-html`,
 but literally has several other output formats available via the `--format`
@@ -42,16 +42,15 @@ compiler with the compiler you just compiled.
 ./literally -o dist -n literally -f node README.md
 ```
 
-- [Command Line Interface](#command-line-interface)
-- [`node` Format](#node-format)
-- [`block` Format](#block-format)
-- [`html` Format](#html-format)
-- [Markdown Parsing](#markdown-parsing)
-- [Javascript and Source Maps](#javascript-and-source-maps)
-- [Appendix (Utilities)](#appendix-utilities)
-- [Appendix (Imports)](#appendix-imports)
-- [Appendix (Metadata)](#appendix-metadata)
-
+* [Command Line Interface](#command-line-interface)
+* [`node` Format](#node-format)
+* [`block` Format](#block-format)
+* [`html` Format](#html-format)
+* [Markdown Parsing](#markdown-parsing)
+* [Javascript and Source Maps](#javascript-and-source-maps)
+* [Appendix (Utilities)](#appendix-utilities)
+* [Appendix (Imports)](#appendix-imports)
+* [Appendix (Metadata)](#appendix-metadata)
 
 # Command Line Interface
 
@@ -59,7 +58,6 @@ Uses [`commander`](https://github.com/tj/commander.js/) for the CLI.  We're
 looking for an API something along the lines of
 `literally [options] [inputs...]` which is exactly what `literally --help`
 describes:
-
 
 [bug](https://github.com/tj/commander.js/#avoiding-option-name-clashes)
 
@@ -129,7 +127,7 @@ function run_compiler(cli_files) {
     const files = cli_files.length > 0 ? cli_files : config.files;
     const output = cmd.output || config.output || process.cwd() + "/";
     const watch = cmd.watch || config.watch;
-    const format = cmd.format || config.format || "html";
+    const format = cmd.format || config.format || "inline-html";
     const name = cmd.name || config.name;
     const screenshot = cmd.screenshot || config.screenshot;
     const retartget = config.retarget || [];
@@ -154,7 +152,6 @@ function run_compiler(cli_files) {
 
 Using a helper function to make thesetasks execute-and-watch
 
-
 ```javascript
 function runwatch(watch, file, ...args) {
     this(file, ...args);
@@ -164,7 +161,7 @@ function runwatch(watch, file, ...args) {
 }
 
 const COMPILERS = {
-    inlinehtml: runwatch.bind(compile_to_inlinehtml),
+    "inline-html": runwatch.bind(compile_to_inlinehtml),
     html: runwatch.bind(compile_to_html),
     node: runwatch.bind(compile_to_node),
     block: runwatch.bind(compile_to_blocks),
@@ -193,7 +190,7 @@ function compile_to_node(file, output, name) {
 
 # `block` Format
 
- [`https://bl.ocks.org`](https://bl.ocks.org)
+[`https://bl.ocks.org`](https://bl.ocks.org)
 
 ```javascript
 async function compile_to_blocks(file, output, name, retarget, is_screenshot) {
@@ -445,3 +442,4 @@ const sourceMap = require("source-map");
 ```block
 license: MIT
 ```
+
