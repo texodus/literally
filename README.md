@@ -225,11 +225,9 @@ function compile_to_node(file, output, name) {
     const path_prefix = path.join(output, out_name);
     const md = fs.readFileSync(file).toString();
     const {javascript, handlebars} = extract(md_name, out_name, md);
-    fs.writeFileSync(`${path_prefix}.js`, javascript);
-    console.log(`Literally compiled ${path_prefix}.js`);
+    write_asset(`${path_prefix}.js`, javascript);
     if (handlebars.length > 0) {
-        fs.writeFileSync(`${path_prefix}.handlebars`, handlebars);
-        console.log(`Literally compiled ${path_prefix}.handlebars`);
+        write_asset(`${path_prefix}.handlebars`, handlebars);
     }
 }
 ```
@@ -245,8 +243,7 @@ function compile_to_inlinehtml(file, output, name) {
     const md = fs.readFileSync(file).toString();
     const {javascript, css, html} = extract(md_name, out_name, md);
     const final = template({html, javascript, css});
-    fs.writeFileSync(`${path_prefix}.html`, final);
-    console.log(`Literally compiled ${path_prefix}.html`);
+    write_asset(`${path_prefix}.html`, final);
 }
 ```
 
@@ -261,16 +258,11 @@ function compile_to_html(file, output, name) {
     const md = fs.readFileSync(file).toString();
     let {javascript, sourcemap, css, html} = extract(md_name, out_name, md);
     javascript += `\n\n//# sourceMappingURL=${out_name}.js.map`;
-
-    fs.writeFileSync(`${path_prefix}.js`, javascript || "");
-    console.log(`Literally compiled ${path_prefix}.js`);
-
-    fs.writeFileSync(`${path_prefix}.js.map`, sourcemap || "");
-    console.log(`Literally compiled ${path_prefix}.js.map`);
+    write_asset(`${path_prefix}.js`, javascript || "");
+    write_asset(`${path_prefix}.js.map`, sourcemap || "");
 
     const final = template({html, src: `${out_name}.js`, css});
-    fs.writeFileSync(`${path_prefix}.html`, final);
-    console.log(`Literally compiled ${path_prefix}.html`);
+    write_asset(`${path_prefix}.html`, final);
 }
 ```
 
@@ -295,25 +287,21 @@ async function compile_to_blocks(file, output, name, retarget, is_screenshot) {
         href: css && css.length > 0 && `index.css`,
     });
 
-    fs.writeFileSync(path.join(output, "index.html"), final);
-    console.log(`Literally compiled ${path.join(output, "index.html")}`);
+    write_asset(path.join(output, "index.html"), final);
+
     if (block && block.length > 0) {
-        fs.writeFileSync(path.join(output, ".block"), block);
-        console.log(`Literally compiled ${path.join(output, ".block")}`);
+        write_asset(path.join(output, ".block"), block);
     }
 
     if (javascript && javascript.length > 0) {
-        fs.writeFileSync(path.join(output, "index.js"), javascript);
-        console.log(`Literally compiled ${path.join(output, "index.js")}`);
+        write_asset(path.join(output, "index.js"), javascript);
     }
 
     if (css && css.length > 0) {
-        fs.writeFileSync(path.join(output, "index.css"), css);
-        console.log(`Literally compiled ${path.join(output, "index.css")}`);
+        write_asset(path.join(output, "index.css"), css);
     }
 
-    fs.writeFileSync(path.join(output, "README.md"), markdown);
-    console.log(`Literally compiled ${path.join(output, "README.md")}`);
+    write_asset(path.join(output, "README.md"), markdown);
     if (is_screenshot) {
         await screenshot(output, out_name);
     }
@@ -474,14 +462,12 @@ async function screenshot(output, name) {
     await page.goto(`http://localhost:${port}/${output}/index.html`);
     //await page.waitForNavigation({waitUntil: "networkidle2"});
     await page.waitFor(1000);
-    await page.screenshot({
-        path: path.join(output, "preview.png"),
-    });
-    console.log(`Captured preview.png`);
-    sharp(path.join(output, "preview.png"))
+    await page.screenshot({path: path.join(output, "preview.png")});
+    log_asset(`preview.png`, undefined, output);
+    await sharp(path.join(output, "preview.png"))
         .resize(230, 120)
         .toFile(path.join(output, "thumbnail.png"));
-    console.log(`Captured thumbnail.png`);
+    log_asset(`thumbnail.png`, undefined, output);
     server.close();
 
     await browser.close();
@@ -489,6 +475,30 @@ async function screenshot(output, name) {
 ```
 
 # Appendix (Utilities)
+
+Write to disk:
+
+```javascript
+const num_formatter = new Intl.NumberFormat("en-us", {
+    style: "decimal",
+    maximumFractionDigits: 2,
+});
+
+function log_asset(name, asset, output) {
+    let size = asset
+        ? Buffer.byteLength(asset, "utf8") / 1024
+        : fs.statSync(path.join(output, name)).size;
+    size = num_formatter.format(size);
+    console.log(
+        chalk`{italic literally} compiled {green ${name}}  {yellow ${size} KB}`
+    );
+}
+
+function write_asset(name, asset) {
+    fs.writeFileSync(name, asset);
+    log_asset(name, asset);
+}
+```
 
 Run-and-watch a compile command.
 
@@ -528,6 +538,7 @@ const program = require("commander");
 const glob = require("glob");
 const handlebars = require("handlebars");
 const sourceMap = require("source-map");
+const chalk = require("chalk");
 ```
 
 # Appendix (Metadata)

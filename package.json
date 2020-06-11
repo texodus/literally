@@ -10,6 +10,7 @@
         "dist/**/*"
     ],
     "dependencies": {
+        "chalk": "^4.1.0",
         "commander": "^5.1.0",
         "eslint": "^7.1.0",
         "eslint-plugin-html": "^6.0.2",
@@ -29,7 +30,7 @@
         "puppeteer": "^3.3.0"
     },
     "devDependencies": {
-        "literally-cli": "0.0.1"
+        "literally-cli": "0.0.2"
     },
     "bin": {
         "literally": "literally"

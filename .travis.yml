@@ -12,5 +12,4 @@ install:
   - yarn
 
 script:
-  - mkdir dist
   - yarn test
