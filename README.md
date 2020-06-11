@@ -192,7 +192,7 @@ function run_compiler(cli_files) {
     }
 
     if (!fs.existsSync(output)) {
-        fs.mkdirSync(output);
+        fs.mkdirSync(output, {recursive: true});
     }
 
     for (const term of files) {
@@ -486,9 +486,9 @@ const num_formatter = new Intl.NumberFormat("en-us", {
 
 function log_asset(name, asset, output) {
     let size = asset
-        ? Buffer.byteLength(asset, "utf8") / 1024
+        ? Buffer.byteLength(asset, "utf8")
         : fs.statSync(path.join(output, name)).size;
-    size = num_formatter.format(size);
+    size = num_formatter.format(size / 1024);
     console.log(
         chalk`{italic literally} compiled {green ${name}}  {yellow ${size} KB}`
     );
