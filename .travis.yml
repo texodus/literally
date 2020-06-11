@@ -1,0 +1,16 @@
+dist: trusty
+language: node_js
+node_js: "10"
+
+git:
+  autocrlf: input
+
+before_install:
+  - npm install -g yarn
+
+install:
+  - yarn
+
+script:
+  - mkdir dist
+  - yarn test

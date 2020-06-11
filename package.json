@@ -21,20 +21,23 @@
         "marked-ast-markdown": "^2.1.0",
         "prettier": "^2.0.5",
         "rimraf": "^3.0.2",
-        "sharp": "^0.25.3"
+        "sharp": "^0.25.3",
+        "source-map": "^0.7.3"
+    },
+    "peerDependencies": {
+        "http-server": "^0.12.3",
+        "puppeteer": "^3.3.0"
+    },
+    "devDependencies": {
+        "literally-cli": "0.0.1"
     },
     "bin": {
         "literally": "literally"
     },
     "scripts": {
+        "build": "node ./node_modules/literally-cli/dist/literally.js --format node --output dist --name literally README.md",
+        "literally-dev": "./literally",
         "bootstrap": "yarn literally-dev --format node --output dist --name literally README.md",
-        "build": "./literally --format node --output dist --name literally.development README.md",
-        "literally-dev": "node --eval \"require('./dist/literally.development.js')\" literally",
-        "bootstrap-dev": "yarn literally-dev --format node --output dist --name literally.development README.md",
-        "test": "yarn build && yarn bootstrap-dev && yarn bootstrap-dev"
-    },
-    "peerDependencies": {
-        "http-server": "^0.12.3",
-        "puppeteer": "^3.3.0"
+        "test": "yarn build && yarn bootstrap && yarn bootstrap"
     }
 }
