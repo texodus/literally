@@ -164,8 +164,8 @@ An example config file in JSON format, which uses the config file _only_
     "format": "blocks",
     "retarget": [
         {
-            rule: "node_modules", 
-            value: "https://cdn.jsdelivr.net/npm/"
+            "rule": "node_modules", 
+            "value": "https://cdn.jsdelivr.net/npm/"
         }
     ]
 }
