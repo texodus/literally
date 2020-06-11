@@ -192,7 +192,7 @@ function run_compiler(cli_files) {
     }
 
     if (!fs.existsSync(output)) {
-        fs.mkdirSync(output);
+        fs.mkdirSync(output, {recursive: true});
     }
 
     for (const term of files) {
