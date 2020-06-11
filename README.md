@@ -3,9 +3,50 @@
 ![npm](https://img.shields.io/npm/v/literally-cli?color=brightgreen)
 [![Build Status](https://travis-ci.org/texodus/literally.svg?branch=master)](https://travis-ci.org/texodus/literally)
 
-`literally` is a tool for literate programming in Javascript.  The `literally`
-"compiler" is itself an example of literate programming, and this `README.md` is
-its source.  You can install `literally` via `yarn`:
+`literally` is a tool for literate programming in Javascript, the source code
+for which you are _literally_ reading right now.  Given a
+Markdown input file with various `javascript`, `css`, `html`,
+`handlebars` or `block` code sections throughout (such as this `README.md`),
+`literally` will extract, clean and generate assets for each, with a few
+project template formats to choose from. 
+
+It is particularly well-suited for
+creating literate examples for Browser libraries, and has a dedicated project
+template for [bl.ocks](https://bl.ocks.org/), which will also generate a clean
+README.md from the source itself, as well as take thumbnail screenshots via
+`puppeteer`.  For local development, you can switch to `html` format to
+generate debug-able Source Maps to the original Markdown.  All in all,
+`literally` can generate:
+
+* `.js`
+* `.js.map` source maps to Markdown
+* `.css`
+* `.html`
+* `.md` cleaned Markdown
+* `.block` bl.ocks metadata
+* `preview.png` and `thumbnail.png` screenshots via `puppeteer`.
+
+The `literally` "compiler" is itself an example of literate programming, and
+this `README.md` is its source.  What follows begins as documentation, but
+gradually incorporates the implementation itself, and is organized in sections:
+
+- [Installation](#installation)
+- [Development and Bootstrapping](#development-and-bootstrapping)
+- [Command Line Interface](#command-line-interface)
+  - [`node` Format](#node-format)
+  - [`inline-html` Format](#inline-html-format)
+  - [`html` Format](#html-format)
+  - [`block` Format](#block-format)
+- [Markdown Parsing](#markdown-parsing)
+- [Javascript and Source Maps](#javascript-and-source-maps)
+- [Handlebars](#handlebars)
+- [Screenshots](#screenshots)
+- [Appendix (Utilities)](#appendix-utilities)
+- [Appendix (Imports)](#appendix-imports)
+- [Appendix (Metadata)](#appendix-metadata)
+# Installation
+
+You can add `literally` to your project via `yarn`:
 
 ```bash
 yarn add literally-cli
@@ -22,44 +63,38 @@ You should now have a `my_literate_module.html` file in your working directory,
 with the original markdown source's CSS, Javascript and HTML blocks inlined
 in their proper locations.  This is the default output format, `inline-html`,
 but literally has several other output formats available via the `--format`
-flag, which can output separate assets for:
+flag.
 
-* `.js`
-* `.js.map` (source maps)
-* `.css`
-* `.html`
-* `.md` (cleaned source)
-* `preview.png` and `thumbnail.png` (screenshots taken via `puppeteer` in bl.ocks sizes).
-* `.block` (bl.ocks metadata for)
+# Development and Bootstrapping
 
 If you are developing/hacking on `literally` itself, you can build this
-`README.md` on top of your local build's compiler (aliased to `yarn bootstrap`).
-You'll need to run this command twice to _bootstrap_, or compile the
-compiler with the compiler you just compiled.
+`README.md` locally, using the `yarn`-installed copy `/node_modules/literally`
+(yes, `literally` is in its own `package.json`'s `"devDependencies"`):
 
 ```bash
-./literally -o dist -n literally -f node README.md
-./literally -o dist -n literally -f node README.md
+yarn build
 ```
 
-* [Command Line Interface](#command-line-interface)
-* [`node` Format](#node-format)
-* [`block` Format](#block-format)
-* [`html` Format](#html-format)
-* [Markdown Parsing](#markdown-parsing)
-* [Javascript and Source Maps](#javascript-and-source-maps)
-* [Appendix (Utilities)](#appendix-utilities)
-* [Appendix (Imports)](#appendix-imports)
-* [Appendix (Metadata)](#appendix-metadata)
+Once built, you can run your locally-built `literally` compiler:
+
+```bash
+yarn literally-dev
+```
+
+For example, to _bootstrap_ the compiler by compiling itself (this `README.md`):
+
+```bash
+yarn literally-dev --output dist --name literally --format node README.md
+```
 
 # Command Line Interface
 
-Uses [`commander`](https://github.com/tj/commander.js/) for the CLI.  We're
-looking for an API something along the lines of
+`literally` uses [`commander`](https://github.com/tj/commander.js/) for its
+Command Line Interface.  We're looking for an API something along the lines of
 `literally [options] [inputs...]` which is exactly what `literally --help`
-describes:
-
-[bug](https://github.com/tj/commander.js/#avoiding-option-name-clashes)
+describes.  The `commander` API is quite declarative and documents itself well
+(though a [name clash](https://github.com/tj/commander.js/#avoiding-option-name-clashes)
+requires we pass some esoteric options):
 
 ```javascript
 function init_cli() {
@@ -118,7 +153,26 @@ function load_config(cmd) {
 }
 ```
 
-There is only one task, which compiles the input `cli_files`
+An example config file in JSON format, which uses the config file _only_
+`retarget` parameter to map dependencies in `node_modules` to their 
+[JSDelivr](https://jsdelivr.com) counterparts instead:
+
+```json
+{
+    "files": ["*.md"],
+    "output": "dist/",
+    "format": "blocks",
+    "retarget": [
+        {
+            rule: "node_modules", 
+            value: "https://cdn.jsdelivr.net/npm/"
+        }
+    ]
+}
+```
+
+The CLI and config file parameters are merged and then iterated over, creating
+compiled assets from the resulting `"files"`:
 
 ```javascript
 function run_compiler(cli_files) {
@@ -150,27 +204,19 @@ function run_compiler(cli_files) {
 }
 ```
 
-Using a helper function to make thesetasks execute-and-watch
+These formats are availble for output:
 
 ```javascript
-function runwatch(watch, file, ...args) {
-    this(file, ...args);
-    if (watch) {
-        fs.watchFile(file, () => this(file, ...args));
-    }
-}
-
 const COMPILERS = {
-    "inline-html": runwatch.bind(compile_to_inlinehtml),
-    html: runwatch.bind(compile_to_html),
     node: runwatch.bind(compile_to_node),
+    html: runwatch.bind(compile_to_html),
+    "inline-html": runwatch.bind(compile_to_inlinehtml),
     block: runwatch.bind(compile_to_blocks),
 };
 ```
 
-... we can specify the three supported output formats.
 
-# `node` Format
+## `node` Format
 
 ```javascript
 function compile_to_node(file, output, name) {
@@ -188,68 +234,8 @@ function compile_to_node(file, output, name) {
 }
 ```
 
-# `block` Format
 
-[`https://bl.ocks.org`](https://bl.ocks.org)
-
-```javascript
-async function compile_to_blocks(file, output, name, retarget, is_screenshot) {
-    let md = fs.readFileSync(file).toString();
-    for (const {rule, value} of retarget) {
-        md = md.replace(new RegExp(rule, "gm"), value);
-    }
-    const md_name = path.parse(file).name;
-    const out_name = name || md_name;
-
-    const parsed = extract(md_name, out_name, md);
-    const {javascript, css, html, block, markdown} = parsed;
-    const final = template({html, javascript, css});
-    fs.writeFileSync(path.join(output, "index.html"), final);
-    console.log(`Literally compiled ${path.join(output, "index.html")}`);
-    if (block.length > 0) {
-        fs.writeFileSync(path.join(output, ".block"), block);
-        console.log(`Literally compiled ${path.join(output, ".block")}`);
-    }
-    fs.writeFileSync(path.join(output, "README.md"), markdown);
-    console.log(`Literally compiled ${path.join(output, "README.md")}`);
-    if (is_screenshot) {
-        await screenshot(output, out_name);
-    }
-}
-```
-
-This format allows screenshots previews to be captured via `puppeteer`, using
-the `--screenshot` CLI flag.
-
-```javascript
-async function screenshot(output, name) {
-    const {createServer} = require("http-server");
-    const sharp = require("sharp");
-    const server = createServer({root: process.cwd()});
-    server.listen();
-    const port = server.server.address().port;
-    const puppeteer = require("puppeteer");
-    const browser = await puppeteer.launch();
-    const page = await browser.newPage();
-    await page.setViewport({width: 960, height: 500});
-    await page.goto(`http://localhost:${port}/${output}/index.html`);
-    //await page.waitForNavigation({waitUntil: "networkidle2"});
-    await page.waitFor(1000);
-    await page.screenshot({
-        path: path.join(output, "preview.png"),
-    });
-    console.log(`Captured preview.png`);
-    sharp(path.join(output, "preview.png"))
-        .resize(230, 120)
-        .toFile(path.join(output, "thumbnail.png"));
-    console.log(`Captured thumbnail.png`);
-    server.close();
-
-    await browser.close();
-}
-```
-
-# `html` Format
+## `inline-html` Format
 
 ```javascript
 function compile_to_inlinehtml(file, output, name) {
@@ -262,7 +248,11 @@ function compile_to_inlinehtml(file, output, name) {
     fs.writeFileSync(`${path_prefix}.html`, final);
     console.log(`Literally compiled ${path_prefix}.html`);
 }
+```
 
+## `html` Format
+
+```javascript
 function compile_to_html(file, output, name) {
     const md_name = path.parse(file).name;
     const out_name = name || md_name;
@@ -284,9 +274,119 @@ function compile_to_html(file, output, name) {
 }
 ```
 
+## `block` Format
+
+[`https://bl.ocks.org`](https://bl.ocks.org)
+
+```javascript
+async function compile_to_blocks(file, output, name, retarget, is_screenshot) {
+    let md = fs.readFileSync(file).toString();
+    for (const {rule, value} of retarget) {
+        md = md.replace(new RegExp(rule, "gm"), value);
+    }
+
+    const md_name = path.parse(file).name;
+    const out_name = name || md_name;
+    const parsed = extract(md_name, out_name, md, true);
+    const {javascript, css, html, block, markdown} = parsed;
+    const final = template({
+        html,
+        src: javascript && javascript.length > 0 && `index.js`,
+        href: css && css.length > 0 && `index.css`,
+    });
+
+    fs.writeFileSync(path.join(output, "index.html"), final);
+    console.log(`Literally compiled ${path.join(output, "index.html")}`);
+    if (block && block.length > 0) {
+        fs.writeFileSync(path.join(output, ".block"), block);
+        console.log(`Literally compiled ${path.join(output, ".block")}`);
+    }
+
+    if (javascript && javascript.length > 0) {
+        fs.writeFileSync(path.join(output, "index.js"), javascript);
+        console.log(`Literally compiled ${path.join(output, "index.js")}`);
+    }
+
+    if (css && css.length > 0) {
+        fs.writeFileSync(path.join(output, "index.css"), css);
+        console.log(`Literally compiled ${path.join(output, "index.css")}`);
+    }
+
+    fs.writeFileSync(path.join(output, "README.md"), markdown);
+    console.log(`Literally compiled ${path.join(output, "README.md")}`);
+    if (is_screenshot) {
+        await screenshot(output, out_name);
+    }
+}
+```
+
+# Markdown Parsing
+
+We'll need some helpers for dealing with markdown
+
+```javascript
+function extract(md_name, out_name, src, is_blocks = false) {
+    let ast = marked_ast.parse(src);
+    const blocks = {markdown: "", javascript: []};
+
+    for (const index in ast) {
+        const section = ast[index];
+        blocks[section.lang] = blocks[section.lang] || "";
+        if (section.lang === "javascript") {
+            let node;
+            for (node of extract_js(blocks, md_name, section)) {
+                blocks.javascript.push(node);
+            }
+            if (node) {
+                node.add("\n");
+            }
+        } else if (section.type === "code") {
+            blocks[section.lang] += section.code + "\n\n";
+        } else if (section.type === "paragraph" && is_blocks) {
+            section.text = section.text.map((x) =>
+                x.replace ? x.replace(/\n/gm, " ") : x
+            );
+        }
+        const clean_md = marked_ast_markdown.writeNode(section, index, ast);
+        blocks.markdown += clean_md.trim() + "\n\n";
+    }
+
+    return extract_sourcemap(md_name, out_name, blocks);
+}
+```
+
+# Javascript and Source Maps
+
+Javascript requires special handling to support source maps - they need the
+original Markdown so the generated Javascript can be annotated with it's
+source for debugging.
+
+```javascript
+function extract_sourcemap(md_name, out_name, blocks) {
+    const {javascript, markdown} = blocks;
+    const sm = new sourceMap.SourceNode(1, 1, `${md_name}.md`, javascript);
+    sm.setSourceContent(`${md_name}.md`, markdown);
+    const {code, map} = sm.toStringWithSourceMap({file: `${out_name}.js`});
+    return {...blocks, javascript: code.trim(), sourcemap: map.toString()};
+}
+
+function* extract_js(blocks, md_name, section) {
+    let ln = blocks.markdown.split("\n").length + 1;
+    for (const line of section.code.split("\n")) {
+        if (line.length > 0) {
+            yield new sourceMap.SourceNode(ln, 1, `${md_name}.md`, line + "\n");
+        }
+        ln++;
+    }
+}
+```
+
+# Handlebars
+
 `literally` supports [handlerbars]() templates and renders to either a file
 `${name}.handlebars` when format is `node`, or a script tag with type
-`text/handlebars` otherwise.  This is the template for `html` format:
+`text/handlebars` otherwise.  In fact, `literally` itself uses such a template
+for its own `html` output formats:
 
 ```handlebars
 <!DOCTYPE html>
@@ -297,6 +397,9 @@ function compile_to_html(file, output, name) {
         <style>
             {{{indent css}}}
         </style>
+        {{/if}}
+        {{#if href}}
+        <link rel="stylesheet" href="{{{href}}}">
         {{/if}}
     </head>
     <body>
@@ -342,6 +445,7 @@ visible to the template.
 function indent(txt, data) {
     const spaces = data.loc.start.column;
     return txt
+        .trim()
         .split("\n")
         .map((line) => line.padStart(line.length + spaces, " "))
         .join("\n")
@@ -349,64 +453,53 @@ function indent(txt, data) {
 }
 ```
 
-# Markdown Parsing
+# Screenshots
 
-We'll need some helpers for dealing with markdown
-
-```javascript
-function extract(md_name, out_name, src, is_blocks = false) {
-    let ast = marked_ast.parse(src);
-    const blocks = {markdown: "", javascript: []};
-
-    for (const index in ast) {
-        const section = ast[index];
-        blocks[section.lang] = blocks[section.lang] || "";
-        if (section.lang === "javascript") {
-            for (node of extract_js(blocks, md_name, section)) {
-                blocks.javascript.push(node);
-            }
-        } else if (section.type === "code") {
-            blocks[section.lang] += section.code + "\n\n";
-        } else if (section.type === "paragraph" && is_blocks) {
-            section.text = section.text.map((x) =>
-                x.replace ? x.replace(/\n/gm, " ") : x
-            );
-        }
-        const clean_md = marked_ast_markdown.writeNode(section, index, ast);
-        blocks.markdown += clean_md.trim() + "\n\n";
-    }
-
-    return extract_sourcemap(md_name, out_name, blocks);
-}
-```
-
-# Javascript and Source Maps
-
-Javascript requires special handling to support source maps - they need the
-original Markdown so the generated Javascript can be annotated with it's
-source for debugging.
+The `block` format supports taking screenshots of your built app via `puppeteer`,
+using the `--screenshot` CLI flag.  This feature requires `peerDependencies` of
+`puppeteer` and `http-server`; feel free to skip these if you are not planning
+on generating `bl.ocks` output.
 
 ```javascript
-function extract_sourcemap(md_name, out_name, blocks) {
-    const {javascript, markdown} = blocks;
-    const sm = new sourceMap.SourceNode(1, 1, `${md_name}.md`, javascript);
-    sm.setSourceContent(`${md_name}.md`, markdown);
-    const {code, map} = sm.toStringWithSourceMap({file: `${out_name}.js`});
-    return {...blocks, javascript: code, sourcemape: map.toString()};
-}
+async function screenshot(output, name) {
+    const {createServer} = require("http-server");
+    const sharp = require("sharp");
+    const server = createServer({root: process.cwd()});
+    server.listen();
+    const port = server.server.address().port;
+    const puppeteer = require("puppeteer");
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.setViewport({width: 960, height: 500});
+    await page.goto(`http://localhost:${port}/${output}/index.html`);
+    //await page.waitForNavigation({waitUntil: "networkidle2"});
+    await page.waitFor(1000);
+    await page.screenshot({
+        path: path.join(output, "preview.png"),
+    });
+    console.log(`Captured preview.png`);
+    sharp(path.join(output, "preview.png"))
+        .resize(230, 120)
+        .toFile(path.join(output, "thumbnail.png"));
+    console.log(`Captured thumbnail.png`);
+    server.close();
 
-function* extract_js(blocks, md_name, section) {
-    let ln = blocks.markdown.split("\n").length + 1;
-    for (const line of section.code.split("\n")) {
-        if (line.length > 0) {
-            yield new sourceMap.SourceNode(ln, 1, `${md_name}.md`, line + "\n");
-        }
-        ln++;
-    }
+    await browser.close();
 }
 ```
 
 # Appendix (Utilities)
+
+Run-and-watch a compile command.
+
+```javascript
+function runwatch(watch, file, ...args) {
+    this(file, ...args);
+    if (watch) {
+        fs.watchFile(file, () => this(file, ...args));
+    }
+}
+```
 
 Re-use metadata from `package.json`.
 
