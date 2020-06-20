@@ -1,6 +1,6 @@
 {
     "name": "literally-cli",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "description": "A tool for literate programming, which can be used to generate various executable assets from markdown files.",
     "main": "dist/literally.js",
     "repository": "https://github.com/texodus/literally",
@@ -30,7 +30,7 @@
         "puppeteer": "^3.3.0"
     },
     "devDependencies": {
-        "literally-cli": "0.0.2"
+        "literally-cli": "0.0.4"
     },
     "bin": {
         "literally": "literally"
