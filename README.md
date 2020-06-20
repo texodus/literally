@@ -381,6 +381,13 @@ for its own `html` output formats:
 <html>
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    </head>
+    <body>
+        {{#if html}}
+
+        {{{indent html}}}
+
+        {{/if}}
         {{#if css}}
         <style>
             {{{indent css}}}
@@ -388,13 +395,6 @@ for its own `html` output formats:
         {{/if}}
         {{#if href}}
         <link rel="stylesheet" href="{{{href}}}">
-        {{/if}}
-    </head>
-    <body>
-        {{#if html}}
-
-        {{{indent html}}}
-
         {{/if}}
         {{#if javascript}}
         <script>
