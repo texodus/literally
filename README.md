@@ -258,10 +258,21 @@ function compile_to_html(file, output, name) {
     const md = fs.readFileSync(file).toString();
     let {javascript, sourcemap, css, html} = extract(md_name, out_name, md);
     javascript += `\n\n//# sourceMappingURL=${out_name}.js.map`;
-    write_asset(`${path_prefix}.js`, javascript || "");
-    write_asset(`${path_prefix}.js.map`, sourcemap || "");
 
-    const final = template({html, src: `${out_name}.js`, css});
+    if (javascript && javascript.length > 0) {
+        write_asset(`${path_prefix}.js`, javascript || "");
+        write_asset(`${path_prefix}.js.map`, sourcemap || "");
+    }
+
+    if (css && css.length > 0) {
+        write_asset(`${path_prefix}.css`, css);
+    }
+
+    const final = template({
+        html,
+        src: javascript && javascript.length > 0 && `${out_name}.js`,
+        href: css && css.length > 0 && `${out_name}.css`,
+    });
     write_asset(`${path_prefix}.html`, final);
 }
 ```
