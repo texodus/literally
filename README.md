@@ -33,7 +33,7 @@ gradually incorporates the implementation itself, and is organized in sections:
 - [Installation](#installation)
 - [Development and Bootstrapping](#development-and-bootstrapping)
 - [Command Line Interface](#command-line-interface)
-  - [`node` Format](#node-format)
+  - [`commonjs` Format](#commonjs-format)
   - [`inline-html` Format](#inline-html-format)
   - [`html` Format](#html-format)
   - [`block` Format](#block-format)
@@ -84,7 +84,7 @@ yarn literally-dev
 For example, to _bootstrap_ the compiler by compiling itself (this `README.md`):
 
 ```bash
-yarn literally-dev --output dist --name literally --format node README.md
+yarn literally-dev --output dist --name literally --format commonjs README.md
 ```
 
 # Command Line Interface
@@ -113,7 +113,7 @@ function init_cli() {
         )
         .option(
             "-n, --name <name>",
-            "The asset name (`html` and `node` format only)"
+            "The asset name (`html` and `commonjs` format only)"
         )
         .option(
             "-c, --config <path>",
@@ -121,7 +121,7 @@ function init_cli() {
         )
         .option(
             "-f, --format <format>",
-            "Which output format to use:  block, node, html."
+            "Which output format to use:  block, commonjs, html."
         )
         .option(
             "-s, --screenshot",
@@ -208,7 +208,7 @@ These formats are availble for output:
 
 ```javascript
 const COMPILERS = {
-    node: runwatch.bind(compile_to_node),
+    commonjs: runwatch.bind(compile_to_commonjs),
     html: runwatch.bind(compile_to_html),
     "inline-html": runwatch.bind(compile_to_inlinehtml),
     block: runwatch.bind(compile_to_blocks),
@@ -216,22 +216,33 @@ const COMPILERS = {
 ```
 
 
-## `node` Format
+## `commonjs` Format
 
 ```javascript
-function compile_to_node(file, output, name) {
+function compile_to_commonjs(file, output, name) {
     const md_name = path.parse(file).name;
     const out_name = name || md_name;
     const path_prefix = path.join(output, out_name);
     const md = fs.readFileSync(file).toString();
-    const {javascript, handlebars} = extract(md_name, out_name, md);
-    write_asset(`${path_prefix}.js`, javascript);
+    const {javascript, handlebars, css, sourcemap} = extract(
+        md_name,
+        out_name,
+        md
+    );
+    if (javascript && javascript.length > 0) {
+        write_asset(`${path_prefix}.js`, javascript || "");
+        write_asset(`${path_prefix}.js.map`, sourcemap || "");
+    }
+
+    if (css && css.length > 0) {
+        write_asset(`${path_prefix}.css`, css);
+    }
+
     if (handlebars.length > 0) {
         write_asset(`${path_prefix}.handlebars`, handlebars);
     }
 }
 ```
-
 
 ## `inline-html` Format
 
@@ -253,12 +264,9 @@ function compile_to_inlinehtml(file, output, name) {
 function compile_to_html(file, output, name) {
     const md_name = path.parse(file).name;
     const out_name = name || md_name;
-
     const path_prefix = path.join(output, out_name);
     const md = fs.readFileSync(file).toString();
     let {javascript, sourcemap, css, html} = extract(md_name, out_name, md);
-    javascript += `\n\n//# sourceMappingURL=${out_name}.js.map`;
-
     if (javascript && javascript.length > 0) {
         write_asset(`${path_prefix}.js`, javascript || "");
         write_asset(`${path_prefix}.js.map`, sourcemap || "");
@@ -358,7 +366,10 @@ function extract(md_name, out_name, src, is_blocks = false) {
 
 Javascript requires special handling to support source maps - they need the
 original Markdown so the generated Javascript can be annotated with it's
-source for debugging.
+source for debugging.  The `source-map` module makes this pretty
+straightforward, though unfortunately since we do not actually parse the input
+Javascript, we are restricted to line granularity, which interferes somewhat
+with Chrome's inter-line debugging.
 
 ```javascript
 function extract_sourcemap(md_name, out_name, blocks) {
@@ -366,7 +377,11 @@ function extract_sourcemap(md_name, out_name, blocks) {
     const sm = new sourceMap.SourceNode(1, 1, `${md_name}.md`, javascript);
     sm.setSourceContent(`${md_name}.md`, markdown);
     const {code, map} = sm.toStringWithSourceMap({file: `${out_name}.js`});
-    return {...blocks, javascript: code.trim(), sourcemap: map.toString()};
+    return {
+        ...blocks,
+        javascript: module_template(out_name, code.trim()),
+        sourcemap: map.toString(),
+    };
 }
 
 function* extract_js(blocks, md_name, section) {
@@ -380,10 +395,30 @@ function* extract_js(blocks, md_name, section) {
 }
 ```
 
+In order to preserve readability in the generated code, `literally` refrains
+from mandating any source-to-source compilation of the Javascript, such as
+Babel.  However, some minimal modularity makes it alot easier to organize large
+documents, we we provide a tiny prelude template to bind `exports` when
+necessary (as well as set the `sourceMappingURL` trailing comment).
+
+```javascript
+function module_template(out_name, src) {
+    return `"use strict";
+if (typeof exports === "undefined") {
+    this.exports = window;
+}
+if (typeof require === "undefined") {
+    this.require = () => window;
+}
+${src}
+//# sourceMappingURL=${out_name}.js.map`;
+}
+```
+
 # Handlebars
 
 `literally` supports [handlerbars]() templates and renders to either a file
-`${name}.handlebars` when format is `node`, or a script tag with type
+`${name}.handlebars` when format is `commonjs`, or a script tag with type
 `text/handlebars` otherwise.  In fact, `literally` itself uses such a template
 for its own `html` output formats:
 
@@ -419,7 +454,7 @@ for its own `html` output formats:
 </html>
 ```
 
-Since this is a node script, it can be read back into Javascript by file name.
+Since this is a node.js script, it can be read back into Javascript by file name.
 `literally` doesn't currently support parameterization for this name, so be
 sure to take into account your compiler settings - in this case the template
 name is `literally.handlerbars` and it lives parallel to the executing module.
@@ -533,7 +568,7 @@ function get_package() {
 
 # Appendix (Imports)
 
-These node builtins:
+These node.js builtins:
 
 ```javascript
 const fs = require("fs");
