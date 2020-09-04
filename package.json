@@ -38,7 +38,7 @@
     "scripts": {
         "build": "node ./node_modules/literally-cli/dist/literally.js --format node --output dist --name literally README.md",
         "literally-dev": "./literally",
-        "bootstrap": "yarn literally-dev --format node --output dist --name literally README.md",
+        "bootstrap": "yarn literally-dev --format commonjs --output dist --name literally README.md",
         "test": "yarn build && yarn bootstrap && yarn bootstrap"
     }
 }
