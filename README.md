@@ -377,10 +377,18 @@ function extract_sourcemap(md_name, out_name, blocks) {
     const sm = new sourceMap.SourceNode(1, 1, `${md_name}.md`, javascript);
     sm.setSourceContent(`${md_name}.md`, markdown);
     const {code, map} = sm.toStringWithSourceMap({file: `${out_name}.js`});
+
+    // use https://babeljs.io/docs/en/babel-core#loadpartialconfig
+    // set just the two props we care about
+
+    const output_js = babel.transformSync(code, {
+        inputSourceMap: map,
+        sourceMaps: true,
+    });
     return {
         ...blocks,
-        javascript: module_template(out_name, code.trim()),
-        sourcemap: map.toString(),
+        javascript: module_template(out_name, output_js.code),
+        sourcemap: JSON.stringify(output_js.map),
     };
 }
 
@@ -403,14 +411,7 @@ necessary (as well as set the `sourceMappingURL` trailing comment).
 
 ```javascript
 function module_template(out_name, src) {
-    return `"use strict";
-if (typeof exports === "undefined") {
-    this.exports = window;
-}
-if (typeof require === "undefined") {
-    this.require = () => window;
-}
-${src}
+    return `${src}
 //# sourceMappingURL=${out_name}.js.map`;
 }
 ```
@@ -585,6 +586,7 @@ const glob = require("glob");
 const handlebars = require("handlebars");
 const sourceMap = require("source-map");
 const chalk = require("chalk");
+const babel = require("@babel/core");
 ```
 
 # Appendix (Metadata)
