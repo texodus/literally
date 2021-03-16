@@ -185,7 +185,6 @@ function run_compiler(cli_files) {
     const name = cmd.name || config.name;
     const screenshot = cmd.screenshot || config.screenshot;
     const retartget = config.retarget || [];
-
     if (!files || !(files.length > 0)) {
         console.error("No input files!");
         return;
@@ -229,6 +228,7 @@ function compile_to_commonjs(file, output, name) {
         out_name,
         md
     );
+
     if (javascript && javascript.length > 0) {
         write_asset(`${path_prefix}.js`, javascript || "");
         write_asset(`${path_prefix}.js.map`, sourcemap || "");
@@ -281,6 +281,7 @@ function compile_to_html(file, output, name) {
         src: javascript && javascript.length > 0 && `${out_name}.js`,
         href: css && css.length > 0 && `${out_name}.css`,
     });
+
     write_asset(`${path_prefix}.html`, final);
 }
 ```
@@ -377,14 +378,7 @@ function extract_sourcemap(md_name, out_name, blocks) {
     const sm = new sourceMap.SourceNode(1, 1, `${md_name}.md`, javascript);
     sm.setSourceContent(`${md_name}.md`, markdown);
     const {code, map} = sm.toStringWithSourceMap({file: `${out_name}.js`});
-
-    // use https://babeljs.io/docs/en/babel-core#loadpartialconfig
-    // set just the two props we care about
-
-    const output_js = babel.transformSync(code, {
-        inputSourceMap: map,
-        sourceMaps: true,
-    });
+    const output_js = babel.transformSync(code, get_babel_options(map));
     return {
         ...blocks,
         javascript: module_template(out_name, output_js.code),
@@ -403,16 +397,27 @@ function* extract_js(blocks, md_name, section) {
 }
 ```
 
-In order to preserve readability in the generated code, `literally` refrains
-from mandating any source-to-source compilation of the Javascript, such as
-Babel.  However, some minimal modularity makes it alot easier to organize large
-documents, we we provide a tiny prelude template to bind `exports` when
-necessary (as well as set the `sourceMappingURL` trailing comment).
+We'd like to use `babel` to use features like ES-modules transparently, but
+without imposing our own babel config on a user's project;  for this we can use
+[`'loadPartialConfig()`](https://babeljs.io/docs/en/babel-core#loadpartialconfig)
+from the `babel` API.
+
+```javascript
+function get_babel_options(map) {
+    return Object.assign(babel.loadPartialConfig().options, {
+        inputSourceMap: map,
+        sourceMaps: true,
+    });
+}
+```
+
+We'll also need to manually append the `sourceMappingURL` trailing comment, for
+`bl.ocks` and local testing where the resulting `literally` JavaScript output is
+used directly in the browser (_sans_-webpack)well as set the ).
 
 ```javascript
 function module_template(out_name, src) {
-    return `${src}
-//# sourceMappingURL=${out_name}.js.map`;
+    return `${src}\n//# sourceMappingURL=${out_name}.js.map`;
 }
 ```
 
