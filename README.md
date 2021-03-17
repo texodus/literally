@@ -207,7 +207,7 @@ These formats are availble for output:
 
 ```javascript
 const COMPILERS = {
-    commonjs: runwatch.bind(compile_to_commonjs),
+    js: runwatch.bind(compile_to_js),
     html: runwatch.bind(compile_to_html),
     "inline-html": runwatch.bind(compile_to_inlinehtml),
     block: runwatch.bind(compile_to_blocks),
@@ -215,10 +215,10 @@ const COMPILERS = {
 ```
 
 
-## `commonjs` Format
+## `js` Format
 
 ```javascript
-function compile_to_commonjs(file, output, name) {
+function compile_to_js(file, output, name) {
     const md_name = path.parse(file).name;
     const out_name = name || md_name;
     const path_prefix = path.join(output, out_name);
@@ -449,12 +449,12 @@ for its own `html` output formats:
         <link rel="stylesheet" href="{{{href}}}">
         {{/if}}
         {{#if javascript}}
-        <script>
+        <script type="module">
             {{{indent javascript}}}
         </script>
         {{/if}}
         {{#if src}}
-        <script src="{{{src}}}"></script>
+        <script type="module" src="{{{src}}}"></script>
         {{/if}}
     </body>
 </html>
