@@ -31,15 +31,15 @@
         "puppeteer": "^3.3.0"
     },
     "devDependencies": {
-        "literally-cli": "0.0.4"
+        "literally-cli": "0.0.8"
     },
     "bin": {
         "literally": "literally"
     },
     "scripts": {
-        "build": "node ./node_modules/literally-cli/dist/literally.js --format node --output dist --name literally README.md",
+        "build": "node ./node_modules/literally-cli/dist/literally.js --format commonjs --output dist --name literally README.md",
         "literally-dev": "./literally",
-        "bootstrap": "yarn literally-dev --format commonjs --output dist --name literally README.md",
+        "bootstrap": "yarn literally-dev --format js --output dist --name literally README.md",
         "test": "yarn build && yarn bootstrap && yarn bootstrap"
     }
 }
